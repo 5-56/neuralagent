@@ -13,6 +13,7 @@ import http from 'http';
 import { v4 as uuidv4 } from 'uuid';
 import { setupBackgroundMode, isBackgroundModeReady } from './electron/utils/wslSetup.js';
 import { logger } from './electron/utils/logger.js';
+import { launchAgent } from './electron/utils/agent.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -243,20 +244,19 @@ ipcMain.on('launch-ai-agent', async (_, baseURL, threadId, backgroundMode) => {
   const screenshotJpegQuality = store.get(constants.SCREENSHOT_JPEG_QUALITY_STORE_KEY) || 80;
 
   if (!backgroundMode) {
-    aiagentProcess = spawn(isWindows ? './aiagent/venv/Scripts/python' : './aiagent/venv/bin/python', ['./aiagent/main.py'], {
-      env: {
-        NEURALAGENT_API_URL: baseURL,
-        NEURALAGENT_THREAD_ID: threadId,
-        NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
-        PYTHONUTF8: '1',
-        NEURALAGENT_OVERRIDE_MODEL_TYPE: String(overrideModelType || ''),
-        NEURALAGENT_OVERRIDE_MODEL_ID: String(overrideModelId || ''),
-        NEURALAGENT_OVERRIDE_PLANNER_MODEL_TYPE: String(overridePlannerModelType || ''),
-        NEURALAGENT_OVERRIDE_PLANNER_MODEL_ID: String(overridePlannerModelId || ''),
-        NEURALAGENT_SCREENSHOT_MEDIA_TYPE: String(screenshotMediaType || 'image/jpeg'),
-        NEURALAGENT_SCREENSHOT_JPEG_QUALITY: String(screenshotJpegQuality || 80),
-      },
-    });
+    aiagentEnv = {
+      NEURALAGENT_API_URL: baseURL,
+      NEURALAGENT_THREAD_ID: threadId,
+      NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
+      PYTHONUTF8: '1',
+      NEURALAGENT_OVERRIDE_MODEL_TYPE: String(overrideModelType || ''),
+      NEURALAGENT_OVERRIDE_MODEL_ID: String(overrideModelId || ''),
+      NEURALAGENT_OVERRIDE_PLANNER_MODEL_TYPE: String(overridePlannerModelType || ''),
+      NEURALAGENT_OVERRIDE_PLANNER_MODEL_ID: String(overridePlannerModelId || ''),
+      NEURALAGENT_SCREENSHOT_MEDIA_TYPE: String(screenshotMediaType || 'image/jpeg'),
+      NEURALAGENT_SCREENSHOT_JPEG_QUALITY: String(screenshotJpegQuality || 80),
+    };
+    aiagentProcess = launchAgent({ isWindows, backgroundMode: false, baseURL, threadId, env: aiagentEnv });
     mainWindow?.minimize();
   } else {
     // VERY IMPORTANT
@@ -286,16 +286,7 @@ ipcMain.on('launch-ai-agent', async (_, baseURL, threadId, backgroundMode) => {
   overlayWindow?.webContents.send('ai-agent-launch', threadId);
   expandMinimizeOverlay(true, false);
 
-  aiagentProcess.stdout.on('data', (data) => logger.info(`[Agent stdout]: ${data}`));
-  aiagentProcess.stderr.on('data', (data) => logger.error(`[Agent stderr]: ${data}`));
-
-  aiagentProcess.on('error', err => {
-    logger.error('Agent process failed to start:', err);
-    mainWindow?.webContents.send('trigger-cancel-all-tasks');
-  });
-
   aiagentProcess.on('exit', (code, signal) => {
-    logger.info(`Agent exited with code ${code}`);
     if (bgAgentWindow) {
       bgAgentWindow.close();
     }

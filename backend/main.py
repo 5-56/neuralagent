@@ -61,3 +61,8 @@ app.include_router(aiagent_router)
 @app.get('/')
 async def index():
     return {'message': datetime.datetime.now()}
+
+
+@app.get('/healthz')
+async def healthz():
+    return {'status': 'ok'}
