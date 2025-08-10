@@ -12,6 +12,7 @@ import url from 'url';
 import http from 'http';
 import { v4 as uuidv4 } from 'uuid';
 import { setupBackgroundMode, isBackgroundModeReady } from './electron/utils/wslSetup.js';
+import { logger } from './electron/utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,7 +86,7 @@ ipcMain.handle('get-refresh-token', () => store.get(constants.REFRESH_TOKEN_STOR
 ipcMain.on('delete-refresh-token', () => store.delete(constants.REFRESH_TOKEN_STORE_KEY));
 
 ipcMain.on('expand-overlay', (_, hasSuggestions) => {
-  console.log("[Main Process] Received 'expand-overlay' IPC message.");
+  logger.info("Received 'expand-overlay' IPC message.");
   expandMinimizeOverlay(true, hasSuggestions);
 });
 
@@ -103,7 +104,7 @@ ipcMain.on('set-last-thinking-mode-value', (_, lastThinkingModeValue) => store.s
 
 // Handle MINIMIZE request
 ipcMain.on('minimize-overlay', () => {
-  console.log("[Main Process] Received 'minimize-overlay' IPC message.");
+  logger.info("Received 'minimize-overlay' IPC message.");
   expandMinimizeOverlay(false);
 });
 
@@ -285,16 +286,16 @@ ipcMain.on('launch-ai-agent', async (_, baseURL, threadId, backgroundMode) => {
   overlayWindow?.webContents.send('ai-agent-launch', threadId);
   expandMinimizeOverlay(true, false);
 
-  aiagentProcess.stdout.on('data', (data) => console.log(`[Agent stdout]: ${data}`));
-  aiagentProcess.stderr.on('data', (data) => console.error(`[Agent stderr]: ${data}`));
+  aiagentProcess.stdout.on('data', (data) => logger.info(`[Agent stdout]: ${data}`));
+  aiagentProcess.stderr.on('data', (data) => logger.error(`[Agent stderr]: ${data}`));
 
   aiagentProcess.on('error', err => {
-    console.error('❌  Agent process failed to start:', err);
+    logger.error('Agent process failed to start:', err);
     mainWindow?.webContents.send('trigger-cancel-all-tasks');
   });
 
   aiagentProcess.on('exit', (code, signal) => {
-    console.log(`[Agent exited with code ${code}]`);
+    logger.info(`Agent exited with code ${code}`);
     if (bgAgentWindow) {
       bgAgentWindow.close();
     }

@@ -212,6 +212,13 @@ cd neuralagent-app
 npm install
 ```
 
+3. **Configure the Desktop app Settings (Custom Models & Screenshot):**
+
+- Open the app and go to Settings in the sidebar.
+- You can override models per role (Planner, Computer Use, Suggestor) with your own Model Type and Model ID.
+- You can tune Screenshot type to image/jpeg (faster, smaller) or image/png (lossless). JPEG quality is configurable.
+- These overrides are applied instantly when you start a task.
+
 3. **Copy `.env.example` to `.env` and fill in:**
 
 ```env
