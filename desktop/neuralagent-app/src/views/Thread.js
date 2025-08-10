@@ -83,6 +83,7 @@ export default function Thread() {
   const [isSendingMessage, setSendingMessage] = useState(false);
   const [backgroundMode, setBackgroundMode] = useState(false);
   const [thinkingMode, setThinkingMode] = useState(false);
+  const [overrideActive, setOverrideActive] = useState(false);
 
   const [isThreadDialogOpen, setThreadDialogOpen] = useState(false);
   const [isDeleteThreadDialogOpen, setDeleteThreadDialogOpen] = useState(false);
@@ -282,6 +283,10 @@ export default function Thread() {
     const asyncTask = async () => {
       const lastBackgroundModeValue = await window.electronAPI.getLastBackgroundModeValue();
       setBackgroundMode(lastBackgroundModeValue === 'true');
+      try {
+        const model = await window.electronAPI.getOverrideModel();
+        setOverrideActive(!!(model?.type && model?.id));
+      } catch {}
     };
     asyncTask();
   }, []);
@@ -316,6 +321,19 @@ export default function Thread() {
             {thread.title}
           </Text>
           <FlexSpacer />
+          {overrideActive && (
+            <div style={{ marginRight: 12, padding: '4px 10px', borderRadius: 999, border: 'thin solid', borderColor: isDarkMode ? 'rgba(255,255,255,0.3)' : 'var(--primary-color)', color: isDarkMode ? 'var(--secondary-color)' : 'var(--primary-color)', fontSize: 12 }}>
+              Custom Model
+            </div>
+          )}
+          <ToggleContainer isDarkMode={isDarkMode}>
+            <ModeToggle isDarkMode={isDarkMode} active={backgroundMode} onClick={() => onBGModeToggleChange(!backgroundMode)}>
+              <MdOutlineSchedule /> Background
+            </ModeToggle>
+            <ModeToggle isDarkMode={isDarkMode} active={thinkingMode} onClick={() => setThinkingMode(!thinkingMode)}>
+              <GiBrain /> Think
+            </ModeToggle>
+          </ToggleContainer>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <IconButton iconSize='27px' color={isDarkMode ? '#fff' : 'rgba(0,0,0,0.5)'} style={{ margin: '0 5px' }} dark
               onClick={() => setThreadDialogOpen(true)}>

@@ -34,3 +34,8 @@ class SuggestorRequest(BaseModel):
     current_os: str
     current_running_apps: list[dict] = []
     screenshot_b64: Optional[str] = None
+    # Optional overrides for model selection (suggestor agent)
+    override_model_type: Optional[str] = None
+    override_model_id: Optional[str] = None
+    # Optional screenshot media type for suggestor
+    screenshot_media_type: Optional[str] = None

@@ -181,26 +181,24 @@ ipcMain.handle('start-background-setup', async () => {
 ipcMain.handle('get-suggestions', async (_, baseURL) => {
   return new Promise((resolve, reject) => {
 
+    const overrideModelType = store.get(constants.OVERRIDE_MODEL_TYPE_STORE_KEY) || '';
+    const overrideModelId = store.get(constants.OVERRIDE_MODEL_ID_STORE_KEY) || '';
+    const screenshotMediaType = store.get(constants.SCREENSHOT_MEDIA_TYPE_STORE_KEY) || 'image/jpeg';
+    const screenshotJpegQuality = store.get(constants.SCREENSHOT_JPEG_QUALITY_STORE_KEY) || 80;
+
     const suggestor = spawn('./aiagent/venv/Scripts/python', ['./aiagent/suggestor.py'], {
       env: {
         NEURALAGENT_API_URL: baseURL,
         NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
+        NEURALAGENT_OVERRIDE_MODEL_TYPE: String(overrideModelType || ''),
+        NEURALAGENT_OVERRIDE_MODEL_ID: String(overrideModelId || ''),
+        NEURALAGENT_SCREENSHOT_MEDIA_TYPE: String(screenshotMediaType || 'image/jpeg'),
+        NEURALAGENT_SCREENSHOT_JPEG_QUALITY: String(screenshotJpegQuality || 80),
       },
     });
 
     const isWindows = process.platform === 'win32';
     const isMac = process.platform === 'darwin';
-
-    // const suggestorPath = isDev
-    // ? path.join(__dirname, 'agent_build', isWindows ? 'suggestor.exe' : 'suggestor')
-    // : path.join(process.resourcesPath, isWindows ? 'suggestor.exe' : 'suggestor');
-
-    // const suggestor = spawn(suggestorPath, [], {
-    //   env: {
-    //     NEURALAGENT_API_URL: baseURL,
-    //     NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
-    //   },
-    // });
 
     let output = '';
     let errorOutput = '';
