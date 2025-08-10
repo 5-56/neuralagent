@@ -38,14 +38,41 @@ function ensureDeviceId() {
   }
 }
 
+// Settings IPC: model overrides and screenshot prefs
+ipcMain.on('set-override-model', (_, type, id) => {
+  if (typeof type === 'string') store.set(constants.OVERRIDE_MODEL_TYPE_STORE_KEY, type);
+  if (typeof id === 'string') store.set(constants.OVERRIDE_MODEL_ID_STORE_KEY, id);
+});
+ipcMain.handle('get-override-model', () => ({
+  type: store.get(constants.OVERRIDE_MODEL_TYPE_STORE_KEY) || '',
+  id: store.get(constants.OVERRIDE_MODEL_ID_STORE_KEY) || '',
+}));
 
+ipcMain.on('set-override-planner-model', (_, type, id) => {
+  if (typeof type === 'string') store.set(constants.OVERRIDE_PLANNER_MODEL_TYPE_STORE_KEY, type);
+  if (typeof id === 'string') store.set(constants.OVERRIDE_PLANNER_MODEL_ID_STORE_KEY, id);
+});
+ipcMain.handle('get-override-planner-model', () => ({
+  type: store.get(constants.OVERRIDE_PLANNER_MODEL_TYPE_STORE_KEY) || '',
+  id: store.get(constants.OVERRIDE_PLANNER_MODEL_ID_STORE_KEY) || '',
+}));
+
+ipcMain.on('set-screenshot-prefs', (_, mediaType, jpegQuality) => {
+  if (typeof mediaType === 'string') store.set(constants.SCREENSHOT_MEDIA_TYPE_STORE_KEY, mediaType);
+  if (typeof jpegQuality === 'number') store.set(constants.SCREENSHOT_JPEG_QUALITY_STORE_KEY, jpegQuality);
+});
+ipcMain.handle('get-screenshot-prefs', () => ({
+  mediaType: store.get(constants.SCREENSHOT_MEDIA_TYPE_STORE_KEY) || 'image/jpeg',
+  jpegQuality: Number(store.get(constants.SCREENSHOT_JPEG_QUALITY_STORE_KEY) || 80),
+}));
+
+// Token & refresh token IPC (used by renderer preload)
 ipcMain.on('set-token', (_, token) => {
   store.set(constants.ACCESS_TOKEN_STORE_KEY, token);
   if (!overlayWindow) {
     createOverlayWindow();
   }
 });
-
 ipcMain.handle('get-token', () => store.get(constants.ACCESS_TOKEN_STORE_KEY));
 ipcMain.on('delete-token', () => {
   store.delete(constants.ACCESS_TOKEN_STORE_KEY);
@@ -209,6 +236,13 @@ ipcMain.on('launch-ai-agent', async (_, baseURL, threadId, backgroundMode) => {
 
   store.set(constants.LAST_BACKGROUND_MODE_VALUE, backgroundMode.toString());
 
+  const overrideModelType = store.get(constants.OVERRIDE_MODEL_TYPE_STORE_KEY) || '';
+  const overrideModelId = store.get(constants.OVERRIDE_MODEL_ID_STORE_KEY) || '';
+  const overridePlannerModelType = store.get(constants.OVERRIDE_PLANNER_MODEL_TYPE_STORE_KEY) || '';
+  const overridePlannerModelId = store.get(constants.OVERRIDE_PLANNER_MODEL_ID_STORE_KEY) || '';
+  const screenshotMediaType = store.get(constants.SCREENSHOT_MEDIA_TYPE_STORE_KEY) || 'image/jpeg';
+  const screenshotJpegQuality = store.get(constants.SCREENSHOT_JPEG_QUALITY_STORE_KEY) || 80;
+
   if (!backgroundMode) {
     aiagentProcess = spawn(isWindows ? './aiagent/venv/Scripts/python' : './aiagent/venv/bin/python', ['./aiagent/main.py'], {
       env: {
@@ -216,20 +250,14 @@ ipcMain.on('launch-ai-agent', async (_, baseURL, threadId, backgroundMode) => {
         NEURALAGENT_THREAD_ID: threadId,
         NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
         PYTHONUTF8: '1',
+        NEURALAGENT_OVERRIDE_MODEL_TYPE: String(overrideModelType || ''),
+        NEURALAGENT_OVERRIDE_MODEL_ID: String(overrideModelId || ''),
+        NEURALAGENT_OVERRIDE_PLANNER_MODEL_TYPE: String(overridePlannerModelType || ''),
+        NEURALAGENT_OVERRIDE_PLANNER_MODEL_ID: String(overridePlannerModelId || ''),
+        NEURALAGENT_SCREENSHOT_MEDIA_TYPE: String(screenshotMediaType || 'image/jpeg'),
+        NEURALAGENT_SCREENSHOT_JPEG_QUALITY: String(screenshotJpegQuality || 80),
       },
     });
-
-    // const agentPath = isDev
-    // ? path.join(__dirname, 'agent_build', isWindows ? 'agent.exe' : 'agent')
-    // : path.join(process.resourcesPath, isWindows ? 'agent.exe' : 'agent');
-
-    // aiagentProcess = spawn(agentPath, [], {
-    //   env: {
-    //     NEURALAGENT_API_URL: baseURL,
-    //     NEURALAGENT_THREAD_ID: threadId,
-    //     NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
-    //   },
-    // });
     mainWindow?.minimize();
   } else {
     // VERY IMPORTANT
@@ -239,6 +267,12 @@ ipcMain.on('launch-ai-agent', async (_, baseURL, threadId, backgroundMode) => {
       NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
       SKIP_LLM_API_KEY_VERIFICATION: 'true',
       PYTHONUTF8: '1',
+      NEURALAGENT_OVERRIDE_MODEL_TYPE: String(overrideModelType || ''),
+      NEURALAGENT_OVERRIDE_MODEL_ID: String(overrideModelId || ''),
+      NEURALAGENT_OVERRIDE_PLANNER_MODEL_TYPE: String(overridePlannerModelType || ''),
+      NEURALAGENT_OVERRIDE_PLANNER_MODEL_ID: String(overridePlannerModelId || ''),
+      NEURALAGENT_SCREENSHOT_MEDIA_TYPE: String(screenshotMediaType || 'image/jpeg'),
+      NEURALAGENT_SCREENSHOT_JPEG_QUALITY: String(screenshotJpegQuality || 80),
     };
 
     const shellCommand = Object.entries(envVars)
