@@ -10,17 +10,24 @@ from routers.aiagent.background import router as bg_mode_aiagent_router
 from utils.procedures import CustomError
 
 from dotenv import load_dotenv
+import os
 load_dotenv()
 
 app = FastAPI(
     title='NeuralAgent'
 )
 
+allowed_origins_env = os.getenv('ALLOWED_ORIGINS', '')
+if allowed_origins_env:
+    allowed_origins = [o.strip() for o in allowed_origins_env.split(',') if o.strip()]
+else:
+    # Default to local Electron React dev and file scheme
+    electron_dev = f"{os.getenv('REACT_APP_PROTOCOL', 'http')}://{os.getenv('REACT_APP_DNS', '127.0.0.1:6763')}"
+    allowed_origins = [electron_dev]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        '*',
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
@@ -54,3 +61,8 @@ app.include_router(aiagent_router)
 @app.get('/')
 async def index():
     return {'message': datetime.datetime.now()}
+
+
+@app.get('/healthz')
+async def healthz():
+    return {'status': 'ok'}

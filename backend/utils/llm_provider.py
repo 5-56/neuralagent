@@ -29,6 +29,17 @@ def get_llm(agent: str, temperature: float = 0.0, max_tokens: int = None, thinki
     if not model_type or not model_id:
         raise ValueError(f"Missing model config for agent: {agent}")
 
+    return _get_llm_by_type_id(model_type=model_type, model_id=model_id, temperature=temperature, max_tokens=max_tokens, thinking_enabled=thinking_enabled)
+
+
+def get_llm_override(model_type: str, model_id: str, temperature: float = 0.0, max_tokens: int = None, thinking_enabled: bool = False) -> BaseChatModel:
+    """Create an LLM instance by explicit model type/id, bypassing env-based agent mapping."""
+    if not model_type or not model_id:
+        raise ValueError("Both model_type and model_id are required for override")
+    return _get_llm_by_type_id(model_type=model_type, model_id=model_id, temperature=temperature, max_tokens=max_tokens, thinking_enabled=thinking_enabled)
+
+
+def _get_llm_by_type_id(*, model_type: str, model_id: str, temperature: float, max_tokens: int | None, thinking_enabled: bool) -> BaseChatModel:
     if model_type == "azure_openai":
         return AzureChatOpenAI(
             azure_deployment=model_id,
@@ -38,7 +49,6 @@ def get_llm(agent: str, temperature: float = 0.0, max_tokens: int = None, thinki
             timeout=None,
             max_retries=2
         )
-    
     elif model_type == "openai":
         return ChatOpenAI(
             model=model_id,
@@ -47,7 +57,6 @@ def get_llm(agent: str, temperature: float = 0.0, max_tokens: int = None, thinki
             timeout=None,
             max_retries=2
         )
-
     elif model_type == "anthropic":
         if not thinking_enabled:
             return ChatAnthropic(
@@ -64,21 +73,18 @@ def get_llm(agent: str, temperature: float = 0.0, max_tokens: int = None, thinki
                 max_retries=2,
                 thinking={"type": "enabled", "budget_tokens": 2000},
             )
-    
     elif model_type == "ollama":
         return ChatOllama(
             base_url=os.getenv('OLLAMA_URL'),
             model=model_id,
             temperature=temperature
         )
-    
     elif model_type == "gemini":
         return ChatGoogleGenerativeAI(
             model=model_id,
             temperature=temperature,
             max_tokens=max_tokens
         )
-
     elif model_type == "bedrock":
         thinking_params = {
             "thinking": {
@@ -109,6 +115,5 @@ def get_llm(agent: str, temperature: float = 0.0, max_tokens: int = None, thinki
                 config=boto3_config,
                 region_name=os.getenv("BEDROCK_REGION", "us-east-1")
             )
-
     else:
-        raise ValueError(f"Unsupported model type '{model_type}' for agent '{agent}'")
+        raise ValueError(f"Unsupported model type '{model_type}'")

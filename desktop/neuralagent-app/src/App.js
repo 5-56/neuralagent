@@ -26,6 +26,7 @@ import Overlay from './views/Overlay';
 import BackgroundAuth from './views/BackgroundAuth';
 import BackgroundTask from './views/BackgroundTask';
 import BackgroundSetup from './views/BackgroundSetup';
+import Settings from './views/Settings';
 
 function AppRoutes() {
   const location = useLocation();
@@ -68,6 +69,7 @@ function AppRoutes() {
               <Routes>
                 <Route path='/' element={<Home />} />
                 <Route path='/threads/:tid' element={<Thread />} />
+                <Route path='/settings' element={<Settings />} />
                 <Route path="*" element={<RedirectTo linkType="router" to="/" redirectType="replace" />} />
               </Routes>
             </AppMainContainer>

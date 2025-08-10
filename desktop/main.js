@@ -12,6 +12,8 @@ import url from 'url';
 import http from 'http';
 import { v4 as uuidv4 } from 'uuid';
 import { setupBackgroundMode, isBackgroundModeReady } from './electron/utils/wslSetup.js';
+import { logger } from './electron/utils/logger.js';
+import { launchAgent } from './electron/utils/agent.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,14 +40,41 @@ function ensureDeviceId() {
   }
 }
 
+// Settings IPC: model overrides and screenshot prefs
+ipcMain.on('set-override-model', (_, type, id) => {
+  if (typeof type === 'string') store.set(constants.OVERRIDE_MODEL_TYPE_STORE_KEY, type);
+  if (typeof id === 'string') store.set(constants.OVERRIDE_MODEL_ID_STORE_KEY, id);
+});
+ipcMain.handle('get-override-model', () => ({
+  type: store.get(constants.OVERRIDE_MODEL_TYPE_STORE_KEY) || '',
+  id: store.get(constants.OVERRIDE_MODEL_ID_STORE_KEY) || '',
+}));
 
+ipcMain.on('set-override-planner-model', (_, type, id) => {
+  if (typeof type === 'string') store.set(constants.OVERRIDE_PLANNER_MODEL_TYPE_STORE_KEY, type);
+  if (typeof id === 'string') store.set(constants.OVERRIDE_PLANNER_MODEL_ID_STORE_KEY, id);
+});
+ipcMain.handle('get-override-planner-model', () => ({
+  type: store.get(constants.OVERRIDE_PLANNER_MODEL_TYPE_STORE_KEY) || '',
+  id: store.get(constants.OVERRIDE_PLANNER_MODEL_ID_STORE_KEY) || '',
+}));
+
+ipcMain.on('set-screenshot-prefs', (_, mediaType, jpegQuality) => {
+  if (typeof mediaType === 'string') store.set(constants.SCREENSHOT_MEDIA_TYPE_STORE_KEY, mediaType);
+  if (typeof jpegQuality === 'number') store.set(constants.SCREENSHOT_JPEG_QUALITY_STORE_KEY, jpegQuality);
+});
+ipcMain.handle('get-screenshot-prefs', () => ({
+  mediaType: store.get(constants.SCREENSHOT_MEDIA_TYPE_STORE_KEY) || 'image/jpeg',
+  jpegQuality: Number(store.get(constants.SCREENSHOT_JPEG_QUALITY_STORE_KEY) || 80),
+}));
+
+// Token & refresh token IPC (used by renderer preload)
 ipcMain.on('set-token', (_, token) => {
   store.set(constants.ACCESS_TOKEN_STORE_KEY, token);
   if (!overlayWindow) {
     createOverlayWindow();
   }
 });
-
 ipcMain.handle('get-token', () => store.get(constants.ACCESS_TOKEN_STORE_KEY));
 ipcMain.on('delete-token', () => {
   store.delete(constants.ACCESS_TOKEN_STORE_KEY);
@@ -58,7 +87,7 @@ ipcMain.handle('get-refresh-token', () => store.get(constants.REFRESH_TOKEN_STOR
 ipcMain.on('delete-refresh-token', () => store.delete(constants.REFRESH_TOKEN_STORE_KEY));
 
 ipcMain.on('expand-overlay', (_, hasSuggestions) => {
-  console.log("[Main Process] Received 'expand-overlay' IPC message.");
+  logger.info("Received 'expand-overlay' IPC message.");
   expandMinimizeOverlay(true, hasSuggestions);
 });
 
@@ -76,7 +105,7 @@ ipcMain.on('set-last-thinking-mode-value', (_, lastThinkingModeValue) => store.s
 
 // Handle MINIMIZE request
 ipcMain.on('minimize-overlay', () => {
-  console.log("[Main Process] Received 'minimize-overlay' IPC message.");
+  logger.info("Received 'minimize-overlay' IPC message.");
   expandMinimizeOverlay(false);
 });
 
@@ -154,26 +183,24 @@ ipcMain.handle('start-background-setup', async () => {
 ipcMain.handle('get-suggestions', async (_, baseURL) => {
   return new Promise((resolve, reject) => {
 
+    const overrideModelType = store.get(constants.OVERRIDE_MODEL_TYPE_STORE_KEY) || '';
+    const overrideModelId = store.get(constants.OVERRIDE_MODEL_ID_STORE_KEY) || '';
+    const screenshotMediaType = store.get(constants.SCREENSHOT_MEDIA_TYPE_STORE_KEY) || 'image/jpeg';
+    const screenshotJpegQuality = store.get(constants.SCREENSHOT_JPEG_QUALITY_STORE_KEY) || 80;
+
     const suggestor = spawn('./aiagent/venv/Scripts/python', ['./aiagent/suggestor.py'], {
       env: {
         NEURALAGENT_API_URL: baseURL,
         NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
+        NEURALAGENT_OVERRIDE_MODEL_TYPE: String(overrideModelType || ''),
+        NEURALAGENT_OVERRIDE_MODEL_ID: String(overrideModelId || ''),
+        NEURALAGENT_SCREENSHOT_MEDIA_TYPE: String(screenshotMediaType || 'image/jpeg'),
+        NEURALAGENT_SCREENSHOT_JPEG_QUALITY: String(screenshotJpegQuality || 80),
       },
     });
 
     const isWindows = process.platform === 'win32';
     const isMac = process.platform === 'darwin';
-
-    // const suggestorPath = isDev
-    // ? path.join(__dirname, 'agent_build', isWindows ? 'suggestor.exe' : 'suggestor')
-    // : path.join(process.resourcesPath, isWindows ? 'suggestor.exe' : 'suggestor');
-
-    // const suggestor = spawn(suggestorPath, [], {
-    //   env: {
-    //     NEURALAGENT_API_URL: baseURL,
-    //     NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
-    //   },
-    // });
 
     let output = '';
     let errorOutput = '';
@@ -209,27 +236,27 @@ ipcMain.on('launch-ai-agent', async (_, baseURL, threadId, backgroundMode) => {
 
   store.set(constants.LAST_BACKGROUND_MODE_VALUE, backgroundMode.toString());
 
+  const overrideModelType = store.get(constants.OVERRIDE_MODEL_TYPE_STORE_KEY) || '';
+  const overrideModelId = store.get(constants.OVERRIDE_MODEL_ID_STORE_KEY) || '';
+  const overridePlannerModelType = store.get(constants.OVERRIDE_PLANNER_MODEL_TYPE_STORE_KEY) || '';
+  const overridePlannerModelId = store.get(constants.OVERRIDE_PLANNER_MODEL_ID_STORE_KEY) || '';
+  const screenshotMediaType = store.get(constants.SCREENSHOT_MEDIA_TYPE_STORE_KEY) || 'image/jpeg';
+  const screenshotJpegQuality = store.get(constants.SCREENSHOT_JPEG_QUALITY_STORE_KEY) || 80;
+
   if (!backgroundMode) {
-    aiagentProcess = spawn(isWindows ? './aiagent/venv/Scripts/python' : './aiagent/venv/bin/python', ['./aiagent/main.py'], {
-      env: {
-        NEURALAGENT_API_URL: baseURL,
-        NEURALAGENT_THREAD_ID: threadId,
-        NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
-        PYTHONUTF8: '1',
-      },
-    });
-
-    // const agentPath = isDev
-    // ? path.join(__dirname, 'agent_build', isWindows ? 'agent.exe' : 'agent')
-    // : path.join(process.resourcesPath, isWindows ? 'agent.exe' : 'agent');
-
-    // aiagentProcess = spawn(agentPath, [], {
-    //   env: {
-    //     NEURALAGENT_API_URL: baseURL,
-    //     NEURALAGENT_THREAD_ID: threadId,
-    //     NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
-    //   },
-    // });
+    aiagentEnv = {
+      NEURALAGENT_API_URL: baseURL,
+      NEURALAGENT_THREAD_ID: threadId,
+      NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
+      PYTHONUTF8: '1',
+      NEURALAGENT_OVERRIDE_MODEL_TYPE: String(overrideModelType || ''),
+      NEURALAGENT_OVERRIDE_MODEL_ID: String(overrideModelId || ''),
+      NEURALAGENT_OVERRIDE_PLANNER_MODEL_TYPE: String(overridePlannerModelType || ''),
+      NEURALAGENT_OVERRIDE_PLANNER_MODEL_ID: String(overridePlannerModelId || ''),
+      NEURALAGENT_SCREENSHOT_MEDIA_TYPE: String(screenshotMediaType || 'image/jpeg'),
+      NEURALAGENT_SCREENSHOT_JPEG_QUALITY: String(screenshotJpegQuality || 80),
+    };
+    aiagentProcess = launchAgent({ isWindows, backgroundMode: false, baseURL, threadId, env: aiagentEnv });
     mainWindow?.minimize();
   } else {
     // VERY IMPORTANT
@@ -239,6 +266,12 @@ ipcMain.on('launch-ai-agent', async (_, baseURL, threadId, backgroundMode) => {
       NEURALAGENT_USER_ACCESS_TOKEN: store.get(constants.ACCESS_TOKEN_STORE_KEY),
       SKIP_LLM_API_KEY_VERIFICATION: 'true',
       PYTHONUTF8: '1',
+      NEURALAGENT_OVERRIDE_MODEL_TYPE: String(overrideModelType || ''),
+      NEURALAGENT_OVERRIDE_MODEL_ID: String(overrideModelId || ''),
+      NEURALAGENT_OVERRIDE_PLANNER_MODEL_TYPE: String(overridePlannerModelType || ''),
+      NEURALAGENT_OVERRIDE_PLANNER_MODEL_ID: String(overridePlannerModelId || ''),
+      NEURALAGENT_SCREENSHOT_MEDIA_TYPE: String(screenshotMediaType || 'image/jpeg'),
+      NEURALAGENT_SCREENSHOT_JPEG_QUALITY: String(screenshotJpegQuality || 80),
     };
 
     const shellCommand = Object.entries(envVars)
@@ -253,16 +286,7 @@ ipcMain.on('launch-ai-agent', async (_, baseURL, threadId, backgroundMode) => {
   overlayWindow?.webContents.send('ai-agent-launch', threadId);
   expandMinimizeOverlay(true, false);
 
-  aiagentProcess.stdout.on('data', (data) => console.log(`[Agent stdout]: ${data}`));
-  aiagentProcess.stderr.on('data', (data) => console.error(`[Agent stderr]: ${data}`));
-
-  aiagentProcess.on('error', err => {
-    console.error('❌  Agent process failed to start:', err);
-    mainWindow?.webContents.send('trigger-cancel-all-tasks');
-  });
-
   aiagentProcess.on('exit', (code, signal) => {
-    console.log(`[Agent exited with code ${code}]`);
     if (bgAgentWindow) {
       bgAgentWindow.close();
     }

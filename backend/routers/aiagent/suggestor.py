@@ -48,22 +48,31 @@ def get_suggestions(request: SuggestorRequest, db: Session = Depends(get_session
         })
 
     if request.screenshot_b64:
-        if os.getenv('SUGGESTOR_AGENT_MODEL_TYPE') == 'ollama':
+        # Respect requested media type for providers which require image_url vs base64
+        if os.getenv('SUGGESTOR_AGENT_MODEL_TYPE') == 'ollama' or (request.screenshot_media_type and request.screenshot_media_type.startswith('image_url')):
             prompt_blocks.append({
-            "type": "image_url",
-            "image_url": f"data:image/png;base64,{request.screenshot_b64}"
-        })
+                "type": "image_url",
+                "image_url": f"data:{request.screenshot_media_type or 'image/jpeg'};base64,{request.screenshot_b64}"
+            })
         else:
             prompt_blocks.append({
                 "type": "image",
                 "source": {
                     "type": "base64",
-                    "media_type": "image/png",
+                    "media_type": request.screenshot_media_type or "image/jpeg",
                     "data": request.screenshot_b64
                 }
             })
 
-    llm = llm_provider.get_llm(agent='suggestor', temperature=0.6)
+    # Allow override for suggestor model
+    if request.override_model_type and request.override_model_id:
+        llm = llm_provider.get_llm_override(
+            model_type=request.override_model_type,
+            model_id=request.override_model_id,
+            temperature=0.6,
+        )
+    else:
+        llm = llm_provider.get_llm(agent='suggestor', temperature=0.6)
 
     prompt = ChatPromptTemplate.from_messages([
         SystemMessage(content=ai_prompts.SUGGESTOR_AGENT_PROMPT),

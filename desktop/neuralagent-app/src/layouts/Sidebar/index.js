@@ -88,13 +88,23 @@ export default function Sidebar() {
       </ThemeToggleWrapper>
       <Button padding='7px 15px' color={'var(--primary-color)'} borderRadius={6} fontSize='15px' dark
          style={{marginTop: '10px'}}
-         onClick={() => navigate('/')}>
+         onClick={() => navigate('/')}
+      >
         <BtnIcon left color='#fff' iconSize='23px'>
           <MdAddCircleOutline />
         </BtnIcon>
         New Task
       </Button>
+
       <List padding='0px 10px' style={{marginTop: '10px', overflowY: 'auto'}}>
+        <ListItemRR padding='10px' to={'/settings'} isDarkMode={isDarkMode} borderRadius='8px' style={{marginTop: '5px'}}>
+          <ListItemContent>
+            <ListItemTitle fontSize='14px' color={isDarkMode ? '#fff' : '#000'} fontWeight='500'>
+              Settings
+            </ListItemTitle>
+          </ListItemContent>
+        </ListItemRR>
+
         {
           !isLoading && threads.length === 0 ? (
             <Text style={{marginTop: '7px', padding: '8px'}}

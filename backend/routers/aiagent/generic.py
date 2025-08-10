@@ -69,7 +69,15 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
                 'status': previous_task.status,
             })
 
-        llm = llm_provider.get_llm(agent='planner', temperature=0.3)
+        # Allow override for planner model
+        if current_subtask_request_obj.override_planner_model_type and current_subtask_request_obj.override_planner_model_id:
+            llm = llm_provider.get_llm_override(
+                model_type=current_subtask_request_obj.override_planner_model_type,
+                model_id=current_subtask_request_obj.override_planner_model_id,
+                temperature=0.3,
+            )
+        else:
+            llm = llm_provider.get_llm(agent='planner', temperature=0.3)
 
         plan_user_message = [
             {
@@ -126,13 +134,25 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
                 thread_task_plan_id=current_plan.id,
                 subtask_text=subtask_item.get('subtask'),
                 subtask_type=SubtaskType.DESKTOP,
-                # subtask_type=SubtaskType.DESKTOP if subtask_item.get(
-                #     'type') == 'desktop_subtask' else SubtaskType.BROWSER,
                 ordering=i + 1,
             )
             db.add(subtask)
             db.commit()
             db.refresh(subtask)
+
+        if len(plan) == 0:
+            ai_message = ThreadMessage(
+                thread_id=instance.id,
+                thread_task_id=task.id,
+                thread_chat_type=ThreadChatType.DESKTOP_USE,
+                thread_chat_from=ThreadChatFromChoices.FROM_AI,
+                text=json.dumps({'actions': [{'action': 'task_completed'}]}),
+            )
+            db.add(ai_message)
+            db.commit()
+            db.refresh(ai_message)
+
+            return {'action': 'task_completed'}
 
     current_subtask = db.exec(select(PlanSubtask).where(and_(
         PlanSubtask.status == SubtaskStatus.ACTIVE,
@@ -208,10 +228,19 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
     if not current_subtask or current_subtask.subtask_type != SubtaskType.DESKTOP:
         raise CustomError(status.HTTP_404_NOT_FOUND, 'No Current Desktop Task!')
 
-    if task.extended_thinking_mode is True:
-        llm = llm_provider.get_llm(agent='computer_use', temperature=1.0, thinking_enabled=True)
+    # Allow per-request override for computer_use model
+    if next_step_req.override_model_type and next_step_req.override_model_id:
+        llm = llm_provider.get_llm_override(
+            model_type=next_step_req.override_model_type,
+            model_id=next_step_req.override_model_id,
+            temperature=1.0 if task.extended_thinking_mode else 0.0,
+            thinking_enabled=task.extended_thinking_mode,
+        )
     else:
-        llm = llm_provider.get_llm(agent='computer_use', temperature=0.0)
+        if task.extended_thinking_mode is True:
+            llm = llm_provider.get_llm(agent='computer_use', temperature=1.0, thinking_enabled=True)
+        else:
+            llm = llm_provider.get_llm(agent='computer_use', temperature=0.0)
 
     previous_subtasks = db.exec(select(PlanSubtask).where(and_(
         PlanSubtask.status != SubtaskStatus.ACTIVE,
@@ -232,17 +261,18 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
             image_io = io.BytesIO(image_bytes)
             screenshot_s3_path = upload_helper.upload_screenshot_s3_bytesio(image_io, extension="png")
         
-        if os.getenv('COMPUTER_USE_AGENT_MODEL_TYPE') == 'ollama':
+        # Respect requested media type for providers which require image_url vs base64
+        if os.getenv('COMPUTER_USE_AGENT_MODEL_TYPE') == 'ollama' or (next_step_req.screenshot_media_type and next_step_req.screenshot_media_type.startswith('image_url')):
             screenshot_user_message_block = {
                 "type": "image_url",
-                "image_url": f"data:image/png;base64,{next_step_req.screenshot_b64}"
+                "image_url": f"data:{next_step_req.screenshot_media_type or 'image/png'};base64,{next_step_req.screenshot_b64}"
             }
         else:
             screenshot_user_message_block = {
                 "type": "image",
                 "source": {
                     "type": "base64",
-                    "media_type": "image/png",
+                    "media_type": next_step_req.screenshot_media_type or "image/png",
                     "data": next_step_req.screenshot_b64
                 }
             }
@@ -259,183 +289,58 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
         .order_by(ThreadMessage.created_at.desc())
         .limit(5)
     ).all()
-    for previous_message in task_previous_messages:
-        previous_action_dict = json.loads(previous_message.text)
-        # previous_action_dict.pop("current_state", None)
-        action_history.append(previous_action_dict)
+    for m in task_previous_messages:
+        try:
+            payload = json.loads(m.text)
+            action_history.append(payload)
+        except Exception:
+            pass
 
-    if task.needs_memory_from_previous_tasks is True:
-        tasks_for_memory = db.exec(select(ThreadTask).where(and_(
-            ThreadTask.thread.has(Thread.user_id == user.id),
-            ThreadTask.thread.has(Thread.status != ThreadStatus.DELETED),
-        )).order_by(ThreadTask.created_at.desc()).limit(5)).all()
-        tasks_for_memory_ids = [task.id for task in tasks_for_memory]
-        memory_items = db.exec(
-            select(ThreadTaskMemoryEntry).where(
-                ThreadTaskMemoryEntry.thread_task_id.in_(tasks_for_memory_ids)
-            )
-        ).all()
-    else:
-        memory_items = db.exec(select(ThreadTaskMemoryEntry).where(
-            ThreadTaskMemoryEntry.thread_task_id == task.id
-        )).all()
+    prompt_data = ai_prompts.COMPUTER_USE_SYSTEM_PROMPT
 
-    memory_items_arr = []
-    for memory_item in memory_items:
-        memory_items_arr.append({
-            'memory_item_text': memory_item.text,
-        })
-
-    computer_use_user_message = [
+    user_message_block = [
         {
             'type': 'text',
-            'text': f'Current Subtask: {current_subtask.subtask_text}'
+            'text': f'Current OS: {next_step_req.current_os}'
         },
         {
             'type': 'text',
-            'text': f'Current OS: {next_step_req.current_os} \n\nCurrent Visible OS Native Interactive Elements: {json.dumps(next_step_req.current_interactive_elements)}'
+            'text': f'Current Visible OS Native Interactive Elements: {json.dumps(next_step_req.current_interactive_elements)}'
         },
         {
             'type': 'text',
             'text': f'Current Running Apps: {json.dumps(next_step_req.current_running_apps)}'
-        }
+        },
     ]
 
-    if len(memory_items_arr) > 0:
-        computer_use_user_message.append({
-            'type': 'text',
-            'text': f'Stored Memory Items: \n {json.dumps(memory_items_arr)}'
-        })
-    if len(action_history) > 0:
-        computer_use_user_message.append({
-            'type': 'text',
-            'text': f'Previous Actions (Limited to 5, newest first): \n {json.dumps(action_history)}'
-        })
     if len(previous_subtasks_arr) > 0:
-        computer_use_user_message.append({
+        user_message_block.append({
             'type': 'text',
-            'text': f'Previous Subtasks: \n {json.dumps(previous_subtasks_arr)}'
+            'text': f'Previous Subtasks (Limited to 10): \n {json.dumps(previous_subtasks_arr)}',
         })
-    
-    computer_use_text_prompt = computer_use_user_message.copy()
-    
-    if screenshot_user_message_block:
-        computer_use_user_message.append(screenshot_user_message_block)
+
+    if screenshot_user_message_block is not None:
+        user_message_block.append(screenshot_user_message_block)
 
     prompt = ChatPromptTemplate.from_messages([
-        SystemMessage(content=ai_prompts.COMPUTER_USE_SYSTEM_PROMPT),
-        HumanMessage(content=computer_use_user_message),
+        SystemMessage(prompt_data),
+        HumanMessage(content=user_message_block)
     ])
 
     chain = prompt | llm
     response = chain.invoke({})
-
-    print('Token Usage: ', response.usage_metadata)
-
-    response_data = None
-    if task.extended_thinking_mode is True:
-        for response_item in response.content:
-            if response_item.get('type') == 'reasoning_content':
-                thinking_message = ThreadMessage(
-                    thread_id=instance.id,
-                    thread_task_id=task.id,
-                    thread_chat_type=ThreadChatType.THINKING,
-                    thread_chat_from=ThreadChatFromChoices.FROM_AI,
-                    chain_of_thought=response_item.get('reasoning_content', {}).get('text'),
-                )
-                db.add(thinking_message)
-                db.commit()
-                db.refresh(thinking_message)
-            elif response_item.get('type') == 'text':
-                response_data = extract_json(response_item.get('text'))
-    else:
-        response_data = extract_json(response.content)
+    response_data = extract_json(response.content)
 
     ai_message = ThreadMessage(
         thread_id=instance.id,
         thread_task_id=task.id,
-        plan_subtask_id=current_subtask.id,
         thread_chat_type=ThreadChatType.DESKTOP_USE,
         thread_chat_from=ThreadChatFromChoices.FROM_AI,
-        screenshot=screenshot_s3_path,
-        prompt=json.dumps(computer_use_text_prompt),
         text=json.dumps(response_data),
+        screenshot=screenshot_s3_path
     )
     db.add(ai_message)
     db.commit()
     db.refresh(ai_message)
-
-    if response_data.get('current_state', {}).get('save_to_memory', False):
-        memory_text = response_data['current_state'].get('memory')
-        if memory_text:
-            memory_entry = ThreadTaskMemoryEntry(
-                thread_task_id=task.id,
-                text=memory_text,
-            )
-            db.add(memory_entry)
-            db.commit()
-            db.refresh(memory_entry)
-
-    # Iterate over all actions
-    actions_arr = response_data.get('actions', [])
-    for act in actions_arr:
-        action_type = act.get('action')
-
-        if action_type == 'subtask_completed' and len(actions_arr) == 1:
-            current_subtask.status = SubtaskStatus.COMPLETED
-            db.add(current_subtask)
-            db.commit()
-            db.refresh(current_subtask)
-
-        elif action_type == 'subtask_failed':
-            # Mark plan, task, and thread as failed
-            current_plan.status = ThreadTaskPlanStatus.FAILED
-            db.add(current_plan)
-            db.commit()
-            db.refresh(current_plan)
-
-            task.status = ThreadTaskStatus.FAILED
-            db.add(task)
-            db.commit()
-            db.refresh(task)
-
-            instance.status = ThreadStatus.STANDBY
-            db.add(instance)
-            db.commit()
-            db.refresh(instance)
-
-            ai_message = ThreadMessage(
-                thread_id=instance.id,
-                thread_task_id=task.id,
-                thread_chat_type=ThreadChatType.DESKTOP_USE,
-                thread_chat_from=ThreadChatFromChoices.FROM_AI,
-                text=json.dumps({'actions': [{'action': 'task_failed'}]}),
-            )
-            db.add(ai_message)
-            db.commit()
-            db.refresh(ai_message)
-
-        elif action_type == 'tool_use':
-            tool = act['params'].get('tool')
-            args = act['params'].get('args', {})
-
-            if tool == 'save_to_memory':
-                memory_entry = ThreadTaskMemoryEntry(
-                    thread_task_id=task.id,
-                    text=args.get('text', ''),
-                )
-                db.add(memory_entry)
-                db.commit()
-                db.refresh(memory_entry)
-
-            elif tool in ['read_pdf', 'fetch_url', 'summarize_youtube_video']:
-                tool_output_text = run_tool_server_side(tool, args)
-                memory_entry = ThreadTaskMemoryEntry(
-                    thread_task_id=task.id,
-                    text=tool_output_text,
-                )
-                db.add(memory_entry)
-                db.commit()
-                db.refresh(memory_entry)
 
     return response_data

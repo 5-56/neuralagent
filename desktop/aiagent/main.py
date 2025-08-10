@@ -1,6 +1,6 @@
 import base64
 import time
-import requests
+import httpx
 import pyautogui
 import mss
 import os
@@ -35,6 +35,7 @@ logging.basicConfig(
 )
 
 screenshot_requested = False
+http_client = httpx.Client(timeout=15.0)
 
 def type_unicode_smart(text: str, delay: float = 0.05) -> None:
     try:
@@ -165,14 +166,19 @@ def focus_app(app_name):
 
     return False
 
-def take_screenshot_b64():
+def take_screenshot_b64(media_type: str = None, jpeg_quality: int = 80):
     with mss.mss() as sct:
         monitor = sct.monitors[1]
         shot = sct.grab(monitor)
         img = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
         img = img.resize((1280, 720))
         buffer = BytesIO()
-        img.save(buffer, format="PNG")
+        mt = (media_type or os.getenv('NEURALAGENT_SCREENSHOT_MEDIA_TYPE') or 'image/jpeg').lower()
+        if mt == 'image/png':
+            img.save(buffer, format="PNG")
+        else:
+            q = int(os.getenv('NEURALAGENT_SCREENSHOT_JPEG_QUALITY') or jpeg_quality or 80)
+            img.save(buffer, format="JPEG", quality=max(1, min(95, q)), optimize=True)
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 def safe_coords(x, y, screen_width, screen_height):
@@ -316,14 +322,19 @@ def get_next_step():
         'current_os': 'MacOS' if platform.system() == 'darwin' else platform.system(),
         'current_interactive_elements': interactive_elements,
         'current_running_apps': running_apps,
+        # Model override for computer_use
+        'override_model_type': os.getenv('NEURALAGENT_OVERRIDE_MODEL_TYPE') or None,
+        'override_model_id': os.getenv('NEURALAGENT_OVERRIDE_MODEL_ID') or None,
     }
 
     if should_send_screenshot:
-        payload['screenshot_b64'] = take_screenshot_b64()
+        media_type = os.getenv('NEURALAGENT_SCREENSHOT_MEDIA_TYPE') or 'image/jpeg'
+        payload['screenshot_b64'] = take_screenshot_b64(media_type=media_type)
+        payload['screenshot_media_type'] = media_type
         screenshot_requested = False
 
     try:
-        response = requests.post(url, json=payload, headers=headers)
+        response = http_client.post(url, json=payload, headers=headers)
         if response.status_code in (200, 201, 202):
             return response.json()
     except Exception as e:
@@ -341,9 +352,12 @@ def get_current_subtask():
         'current_os': 'MacOS' if platform.system() == 'darwin' else platform.system(),
         'current_interactive_elements': ui_extraction.extract_interactive_elements(),
         'current_running_apps': ui_extraction.get_running_apps(),
+        # Optional planner override
+        'override_planner_model_type': os.getenv('NEURALAGENT_OVERRIDE_PLANNER_MODEL_TYPE') or None,
+        'override_planner_model_id': os.getenv('NEURALAGENT_OVERRIDE_PLANNER_MODEL_ID') or None,
     }
     try:
-        response = requests.post(url, json=payload, headers=headers)
+        response = http_client.post(url, json=payload, headers=headers)
         if response.status_code in (200, 201, 202):
             return response.json()
     except:
@@ -372,3 +386,7 @@ async def main_loop():
 
 if __name__ == "__main__":
     asyncio.run(main_loop())
+    try:
+        http_client.close()
+    except Exception:
+        pass

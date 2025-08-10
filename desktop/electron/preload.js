@@ -28,4 +28,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSetupStatus: (cb) => ipcRenderer.on('setup-status', (_, msg) => cb(msg)),
   onSetupProgress: (cb) => ipcRenderer.on('setup-progress', (_, pct) => cb(pct)),
   onSetupComplete: (cb) => ipcRenderer.on('setup-complete', (_, result) => cb(result)),
+  // Settings IPC for model override and screenshot prefs
+  setOverrideModel: (type, id) => ipcRenderer.send('set-override-model', type, id),
+  getOverrideModel: () => ipcRenderer.invoke('get-override-model'),
+  setOverridePlannerModel: (type, id) => ipcRenderer.send('set-override-planner-model', type, id),
+  getOverridePlannerModel: () => ipcRenderer.invoke('get-override-planner-model'),
+  setScreenshotPrefs: (mediaType, jpegQuality) => ipcRenderer.send('set-screenshot-prefs', mediaType, jpegQuality),
+  getScreenshotPrefs: () => ipcRenderer.invoke('get-screenshot-prefs'),
 });

@@ -7,9 +7,9 @@ nuitka
 pyperclip
 httpx
 websockets
-pywin32
+pywin32; platform_system == "Windows"
 psutil
 # pywinsandbox
-uiautomation
-# pyobjc
-# pyatspi
+uiautomation; platform_system == "Windows"
+# pyobjc; platform_system == "Darwin"
+# pyatspi; platform_system == "Linux"
