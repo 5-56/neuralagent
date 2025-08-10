@@ -1,6 +1,6 @@
 import base64
 import time
-import requests
+import httpx
 import os
 import subprocess
 from io import BytesIO
@@ -27,14 +27,20 @@ logging.basicConfig(
 )
 
 screenshot_requested = False
+http_client = httpx.Client(timeout=15.0)
 
-def take_screenshot_b64():
+def take_screenshot_b64(media_type: str = None, jpeg_quality: int = 80):
     """Capture, resize, and return screenshot as base64 string without saving to disk."""
     proc = subprocess.Popen(["scrot", "-q", "60", "-"], stdout=subprocess.PIPE)
     image = Image.open(proc.stdout).convert("RGB")
     # image = image.resize((800, 500))
     buffer = BytesIO()
-    image.save(buffer, format="JPEG", quality=60)
+    mt = (media_type or os.getenv('NEURALAGENT_SCREENSHOT_MEDIA_TYPE') or 'image/jpeg').lower()
+    if mt == 'image/png':
+        image.save(buffer, format="PNG")
+    else:
+        q = int(os.getenv('NEURALAGENT_SCREENSHOT_JPEG_QUALITY') or jpeg_quality or 80)
+        image.save(buffer, format="JPEG", quality=max(1, min(95, q)), optimize=True)
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 def safe_coords(x, y, screen_width, screen_height):
@@ -49,8 +55,8 @@ def run_xdotool(*args):
 def open_new_tab(url):
     try:
         encoded_url = urllib.parse.quote(url, safe='')
-        response = requests.put(f"{os.getenv('BROWSER_CDP_URL', 'http://127.0.0.1:13783')}/json/new?{encoded_url}")
-        response.raise_for_status()
+        r = http_client.put(f"{os.getenv('BROWSER_CDP_URL', 'http://127.0.0.1:13783')}/json/new?{encoded_url}")
+        r.raise_for_status()
         print(f"✅ Opened new tab: {url}")
     except Exception as e:
         print(f"❌ Failed to open new tab: {e}")
@@ -163,9 +169,9 @@ def perform_action(response):
 
 def get_chrome_tabs():
     try:
-        response = requests.get(f'{os.getenv('BROWSER_CDP_URL')}/json')
-        response.raise_for_status()
-        tabs = response.json()
+        r = http_client.get(f"{os.getenv('BROWSER_CDP_URL', 'http://127.0.0.1:13783')}/json")
+        r.raise_for_status()
+        tabs = r.json()
 
         open_tabs = []
         for tab in tabs:
@@ -203,18 +209,22 @@ def get_next_step():
     else:
         print("No tabs found or Chrome not running.")
 
+    media_type = os.getenv('NEURALAGENT_SCREENSHOT_MEDIA_TYPE') or 'image/jpeg'
     payload = {
         'current_open_tabs': tabs,
         'current_url': current_url,
-        'screenshot_b64': take_screenshot_b64(),
+        'screenshot_b64': take_screenshot_b64(media_type=media_type),
+        'screenshot_media_type': media_type,
+        'override_model_type': os.getenv('NEURALAGENT_OVERRIDE_MODEL_TYPE') or None,
+        'override_model_id': os.getenv('NEURALAGENT_OVERRIDE_MODEL_ID') or None,
     }
 
     screenshot_requested = False
 
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        if response.status_code in (200, 201, 202):
-            return response.json()
+        r = http_client.post(url, json=payload, headers=headers)
+        if r.status_code in (200, 201, 202):
+            return r.json()
     except Exception as e:
         print(f"[❌] Error sending next step request: {e}")
     
@@ -235,3 +245,7 @@ async def main_loop():
 
 if __name__ == "__main__":
     asyncio.run(main_loop())
+    try:
+        http_client.close()
+    except Exception:
+        pass
