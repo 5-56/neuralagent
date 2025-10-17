@@ -24,9 +24,9 @@ class PlannerAgent(BaseAgent):
             prompt = self._build_planning_prompt(message, context)
             
             # 调用AI生成规划
+            messages = [{"role": "user", "content": prompt}]
             response = await self.ai_provider.generate_response(
-                prompt=prompt,
-                context=context.to_dict(),
+                messages=messages,
                 temperature=0.7,
                 max_tokens=2048
             )
@@ -179,8 +179,9 @@ class PlannerAgent(BaseAgent):
 }}
 """
         
+        messages = [{"role": "user", "content": prompt}]
         response = await self.ai_provider.generate_response(
-            prompt=prompt,
+            messages=messages,
             temperature=0.3,
             max_tokens=512
         )
@@ -212,8 +213,9 @@ class PlannerAgent(BaseAgent):
 请输出优化后的规划，保持JSON格式。
 """
         
+        messages = [{"role": "user", "content": prompt}]
         response = await self.ai_provider.generate_response(
-            prompt=prompt,
+            messages=messages,
             temperature=0.5,
             max_tokens=2048
         )

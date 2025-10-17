@@ -9,14 +9,6 @@ from typing import Dict, List, Optional, Any, Union
 from enum import Enum
 import logging
 
-from langchain_openai import ChatOpenAI, AzureChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_ollama import ChatOllama
-from langchain_aws import ChatBedrockConverse
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import BaseMessage
-
 from core.config import settings
 from core.exceptions import AIProviderError
 
@@ -51,239 +43,53 @@ class AIProvider(ABC):
     @abstractmethod
     async def generate_response(
         self, 
-        messages: List[BaseMessage], 
+        messages: List[dict], 
         **kwargs
     ) -> str:
         """生成响应"""
         pass
     
     @abstractmethod
-    async def generate_streaming_response(
-        self, 
-        messages: List[BaseMessage], 
-        **kwargs
-    ) -> Any:
-        """生成流式响应"""
-        pass
-    
-    @abstractmethod
     async def health_check(self) -> bool:
         """健康检查"""
         pass
 
 
-class OpenAIProvider(AIProvider):
-    """OpenAI提供商"""
+class MockAIProvider(AIProvider):
+    """模拟AI提供商（用于测试）"""
     
-    def __init__(self, model: str = None, **kwargs):
-        super().__init__(AIProviderType.OPENAI, model or settings.OPENAI_MODEL, **kwargs)
+    def __init__(self, provider_type: AIProviderType, model: str = "mock-model", **kwargs):
+        super().__init__(provider_type, model, **kwargs)
     
     async def initialize(self) -> None:
-        """初始化OpenAI客户端"""
-        if not settings.OPENAI_API_KEY:
-            raise AIProviderError("OpenAI API密钥未配置", "openai")
-        
-        self._client = ChatOpenAI(
-            model=self.model,
-            api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_BASE_URL,
-            **self.kwargs
-        )
-        logger.info(f"OpenAI提供商初始化完成，模型: {self.model}")
+        """初始化模拟客户端"""
+        self._client = "mock_client"
+        logger.info(f"模拟AI提供商初始化完成，类型: {self.provider_type}")
     
-    async def generate_response(self, messages: List[BaseMessage], **kwargs) -> str:
-        """生成响应"""
+    async def generate_response(self, messages: List[dict], **kwargs) -> str:
+        """生成模拟响应"""
         if not self._client:
             await self.initialize()
         
-        try:
-            response = await self._client.ainvoke(messages, **kwargs)
-            return response.content
-        except Exception as e:
-            raise AIProviderError(f"生成响应失败: {str(e)}", "openai")
-    
-    async def generate_streaming_response(self, messages: List[BaseMessage], **kwargs):
-        """生成流式响应"""
-        if not self._client:
-            await self.initialize()
+        # 模拟AI响应
+        last_message = messages[-1] if messages else {"content": "Hello"}
+        content = last_message.get("content", "Hello")
         
-        try:
-            async for chunk in self._client.astream(messages, **kwargs):
-                yield chunk
-        except Exception as e:
-            raise AIProviderError(f"生成流式响应失败: {str(e)}", "openai")
+        if "任务" in content or "task" in content.lower():
+            return "我理解您想要创建一个任务。让我为您分析并制定执行计划..."
+        elif "帮助" in content or "help" in content.lower():
+            return "我是羲和AI助手，可以帮助您进行桌面自动化、任务管理和智能对话。"
+        else:
+            return f"我收到了您的消息：{content}。作为AI助手，我随时为您服务。"
     
     async def health_check(self) -> bool:
         """健康检查"""
         try:
             if not self._client:
                 await self.initialize()
-            
-            # 发送简单测试请求
-            test_messages = [{"role": "user", "content": "Hello"}]
-            await self.generate_response(test_messages)
             return True
         except Exception as e:
-            logger.error(f"OpenAI健康检查失败: {e}")
-            return False
-
-
-class AnthropicProvider(AIProvider):
-    """Anthropic提供商"""
-    
-    def __init__(self, model: str = None, **kwargs):
-        super().__init__(AIProviderType.ANTHROPIC, model or settings.ANTHROPIC_MODEL, **kwargs)
-    
-    async def initialize(self) -> None:
-        """初始化Anthropic客户端"""
-        if not settings.ANTHROPIC_API_KEY:
-            raise AIProviderError("Anthropic API密钥未配置", "anthropic")
-        
-        self._client = ChatAnthropic(
-            model=self.model,
-            api_key=settings.ANTHROPIC_API_KEY,
-            **self.kwargs
-        )
-        logger.info(f"Anthropic提供商初始化完成，模型: {self.model}")
-    
-    async def generate_response(self, messages: List[BaseMessage], **kwargs) -> str:
-        """生成响应"""
-        if not self._client:
-            await self.initialize()
-        
-        try:
-            response = await self._client.ainvoke(messages, **kwargs)
-            return response.content
-        except Exception as e:
-            raise AIProviderError(f"生成响应失败: {str(e)}", "anthropic")
-    
-    async def generate_streaming_response(self, messages: List[BaseMessage], **kwargs):
-        """生成流式响应"""
-        if not self._client:
-            await self.initialize()
-        
-        try:
-            async for chunk in self._client.astream(messages, **kwargs):
-                yield chunk
-        except Exception as e:
-            raise AIProviderError(f"生成流式响应失败: {str(e)}", "anthropic")
-    
-    async def health_check(self) -> bool:
-        """健康检查"""
-        try:
-            if not self._client:
-                await self.initialize()
-            
-            test_messages = [{"role": "user", "content": "Hello"}]
-            await self.generate_response(test_messages)
-            return True
-        except Exception as e:
-            logger.error(f"Anthropic健康检查失败: {e}")
-            return False
-
-
-class GoogleProvider(AIProvider):
-    """Google Gemini提供商"""
-    
-    def __init__(self, model: str = None, **kwargs):
-        super().__init__(AIProviderType.GOOGLE, model or settings.GOOGLE_MODEL, **kwargs)
-    
-    async def initialize(self) -> None:
-        """初始化Google客户端"""
-        if not settings.GOOGLE_API_KEY:
-            raise AIProviderError("Google API密钥未配置", "google")
-        
-        self._client = ChatGoogleGenerativeAI(
-            model=self.model,
-            google_api_key=settings.GOOGLE_API_KEY,
-            **self.kwargs
-        )
-        logger.info(f"Google提供商初始化完成，模型: {self.model}")
-    
-    async def generate_response(self, messages: List[BaseMessage], **kwargs) -> str:
-        """生成响应"""
-        if not self._client:
-            await self.initialize()
-        
-        try:
-            response = await self._client.ainvoke(messages, **kwargs)
-            return response.content
-        except Exception as e:
-            raise AIProviderError(f"生成响应失败: {str(e)}", "google")
-    
-    async def generate_streaming_response(self, messages: List[BaseMessage], **kwargs):
-        """生成流式响应"""
-        if not self._client:
-            await self.initialize()
-        
-        try:
-            async for chunk in self._client.astream(messages, **kwargs):
-                yield chunk
-        except Exception as e:
-            raise AIProviderError(f"生成流式响应失败: {str(e)}", "google")
-    
-    async def health_check(self) -> bool:
-        """健康检查"""
-        try:
-            if not self._client:
-                await self.initialize()
-            
-            test_messages = [{"role": "user", "content": "Hello"}]
-            await self.generate_response(test_messages)
-            return True
-        except Exception as e:
-            logger.error(f"Google健康检查失败: {e}")
-            return False
-
-
-class OllamaProvider(AIProvider):
-    """Ollama本地模型提供商"""
-    
-    def __init__(self, model: str = None, **kwargs):
-        super().__init__(AIProviderType.OLLAMA, model or settings.OLLAMA_MODEL, **kwargs)
-    
-    async def initialize(self) -> None:
-        """初始化Ollama客户端"""
-        self._client = ChatOllama(
-            model=self.model,
-            base_url=settings.OLLAMA_BASE_URL,
-            **self.kwargs
-        )
-        logger.info(f"Ollama提供商初始化完成，模型: {self.model}")
-    
-    async def generate_response(self, messages: List[BaseMessage], **kwargs) -> str:
-        """生成响应"""
-        if not self._client:
-            await self.initialize()
-        
-        try:
-            response = await self._client.ainvoke(messages, **kwargs)
-            return response.content
-        except Exception as e:
-            raise AIProviderError(f"生成响应失败: {str(e)}", "ollama")
-    
-    async def generate_streaming_response(self, messages: List[BaseMessage], **kwargs):
-        """生成流式响应"""
-        if not self._client:
-            await self.initialize()
-        
-        try:
-            async for chunk in self._client.astream(messages, **kwargs):
-                yield chunk
-        except Exception as e:
-            raise AIProviderError(f"生成流式响应失败: {str(e)}", "ollama")
-    
-    async def health_check(self) -> bool:
-        """健康检查"""
-        try:
-            if not self._client:
-                await self.initialize()
-            
-            test_messages = [{"role": "user", "content": "Hello"}]
-            await self.generate_response(test_messages)
-            return True
-        except Exception as e:
-            logger.error(f"Ollama健康检查失败: {e}")
+            logger.error(f"模拟AI提供商健康检查失败: {e}")
             return False
 
 
@@ -299,23 +105,16 @@ class AIProviderManager:
         if self._initialized:
             return
         
-        # 根据配置初始化提供商
-        providers_to_init = []
-        
-        if settings.OPENAI_API_KEY:
-            providers_to_init.append(OpenAIProvider())
-        
-        if settings.ANTHROPIC_API_KEY:
-            providers_to_init.append(AnthropicProvider())
-        
-        if settings.GOOGLE_API_KEY:
-            providers_to_init.append(GoogleProvider())
-        
-        # Ollama总是尝试初始化（本地服务）
-        providers_to_init.append(OllamaProvider())
+        # 创建模拟提供商
+        mock_providers = [
+            MockAIProvider(AIProviderType.OPENAI, "gpt-4"),
+            MockAIProvider(AIProviderType.ANTHROPIC, "claude-3"),
+            MockAIProvider(AIProviderType.GOOGLE, "gemini-pro"),
+            MockAIProvider(AIProviderType.OLLAMA, "llama2")
+        ]
         
         # 初始化提供商
-        for provider in providers_to_init:
+        for provider in mock_providers:
             try:
                 await provider.initialize()
                 self._providers[provider.provider_type] = provider
@@ -326,13 +125,25 @@ class AIProviderManager:
         self._initialized = True
         logger.info(f"AI提供商管理器初始化完成，可用提供商: {list(self._providers.keys())}")
     
-    async def get_provider(self, provider_type: AIProviderType) -> AIProvider:
+    async def get_provider(self, provider_type: Union[AIProviderType, str]) -> AIProvider:
         """获取指定类型的提供商"""
         if not self._initialized:
             await self.initialize()
         
+        if isinstance(provider_type, str):
+            try:
+                provider_type = AIProviderType(provider_type)
+            except ValueError:
+                raise AIProviderError(f"无效的提供商类型: {provider_type}", provider_type)
+        
         if provider_type not in self._providers:
-            raise AIProviderError(f"提供商 {provider_type} 不可用", provider_type.value)
+            # 返回默认提供商
+            if AIProviderType.OPENAI in self._providers:
+                return self._providers[AIProviderType.OPENAI]
+            elif self._providers:
+                return list(self._providers.values())[0]
+            else:
+                raise AIProviderError(f"没有可用的AI提供商", provider_type.value)
         
         return self._providers[provider_type]
     

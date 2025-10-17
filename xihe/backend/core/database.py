@@ -1,7 +1,6 @@
 # 数据库连接和初始化
 import logging
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 from core.config import settings
@@ -28,7 +27,10 @@ else:
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # 创建基础模型类
-Base = declarative_base()
+from sqlalchemy.orm import DeclarativeBase
+
+class Base(DeclarativeBase):
+    pass
 
 def get_db() -> Session:
     """获取数据库会话"""

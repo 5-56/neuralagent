@@ -131,20 +131,18 @@ class ExecutorAgent(BaseAgent):
         
         if coordinates:
             x, y = coordinates
-            result = self.desktop_automation.execute_action(
-                action_type=ActionType.CLICK,
-                x=x,
-                y=y
-            )
+            result = await self.desktop_automation.execute_action({
+                "type": ActionType.CLICK,
+                "params": {"x": x, "y": y}
+            })
         elif element:
             # 需要先找到元素位置
             element_coords = await self._find_element_coordinates(element, context)
             if element_coords:
-                result = self.desktop_automation.execute_action(
-                    action_type=ActionType.CLICK,
-                    x=element_coords[0],
-                    y=element_coords[1]
-                )
+                result = await self.desktop_automation.execute_action({
+                    "type": ActionType.CLICK,
+                    "params": {"x": element_coords[0], "y": element_coords[1]}
+                })
             else:
                 return {
                     "success": False,
@@ -179,11 +177,10 @@ class ExecutorAgent(BaseAgent):
         if target:
             target_coords = await self._find_element_coordinates(target, context)
             if target_coords:
-                click_result = self.desktop_automation.execute_action(
-                    action_type=ActionType.CLICK,
-                    x=target_coords[0],
-                    y=target_coords[1]
-                )
+                click_result = await self.desktop_automation.execute_action({
+                    "type": ActionType.CLICK,
+                    "params": {"x": target_coords[0], "y": target_coords[1]}
+                })
                 if not click_result.get("success", False):
                     return {
                         "success": False,
@@ -192,10 +189,10 @@ class ExecutorAgent(BaseAgent):
                     }
         
         # 执行输入
-        result = self.desktop_automation.execute_action(
-            action_type=ActionType.TYPE,
-            text=text
-        )
+        result = await self.desktop_automation.execute_action({
+            "type": ActionType.TYPE,
+            "params": {"text": text}
+        })
         
         return {
             "success": result.get("success", False),
@@ -210,11 +207,10 @@ class ExecutorAgent(BaseAgent):
         direction = action_data.get("direction", "down")
         amount = action_data.get("amount", 3)
         
-        result = self.desktop_automation.execute_action(
-            action_type=ActionType.SCROLL,
-            direction=direction,
-            amount=amount
-        )
+        result = await self.desktop_automation.execute_action({
+            "type": ActionType.SCROLL,
+            "params": {"direction": direction, "clicks": amount}
+        })
         
         return {
             "success": result.get("success", False),
@@ -226,9 +222,10 @@ class ExecutorAgent(BaseAgent):
     
     async def _execute_screenshot(self, action_data: Dict[str, Any], context: AgentContext) -> Dict[str, Any]:
         """执行截图操作"""
-        result = self.desktop_automation.execute_action(
-            action_type=ActionType.SCREENSHOT
-        )
+        result = await self.desktop_automation.execute_action({
+            "type": ActionType.SCREENSHOT,
+            "params": {}
+        })
         
         return {
             "success": result.get("success", False),
@@ -266,8 +263,9 @@ class ExecutorAgent(BaseAgent):
 }}
 """
         
+        messages = [{"role": "user", "content": prompt}]
         response = await self.ai_provider.generate_response(
-            prompt=prompt,
+            messages=messages,
             temperature=0.3,
             max_tokens=512
         )

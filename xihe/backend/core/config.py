@@ -5,10 +5,10 @@
 
 import os
 from typing import List, Optional
-from pydantic import BaseSettings, validator
+from pydantic import BaseModel, Field, field_validator
 
 
-class Settings(BaseSettings):
+class Settings(BaseModel):
     """应用配置"""
     
     # 基础配置
@@ -88,21 +88,24 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "xihe.log"
     
-    @validator("ALLOWED_HOSTS", pre=True)
+    @field_validator("ALLOWED_HOSTS", mode="before")
+    @classmethod
     def assemble_cors_origins(cls, v):
         if isinstance(v, str):
             return [i.strip() for i in v.split(",")]
         return v
     
-    @validator("SECURITY_LEVEL")
+    @field_validator("SECURITY_LEVEL")
+    @classmethod
     def validate_security_level(cls, v):
         if v not in ["low", "medium", "high"]:
             raise ValueError("安全级别必须是 low, medium 或 high")
         return v
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": True
+    }
 
 
 # 创建全局设置实例
