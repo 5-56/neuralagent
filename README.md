@@ -1,277 +1,142 @@
+# 羲和 (Xihe) - 智能化桌面助手
 
-[![NeuralAgent](docs/images/neuralagent_github_cover.jpg)](https://www.getneuralagent.com)
+羲和是一个基于AI的智能化桌面自动化助手，相比NeuralAgent具有更强的智能化能力和更广泛的AI提供商支持。
 
-**NeuralAgent** is your AI personal assistant that actually *gets things done*. It lives on your desktop, types, clicks, navigates the browser, fills out forms, sends emails, and performs tasks automatically using modern large language models all powered by a fast, extensible, and open architecture. NeuralAgent uses your computer both in the foreground and the background.
+## 🌟 核心特性
 
-> Real productivity. Not just conversation.
+### 智能化增强
+- **多模态交互**: 支持文本、语音、图像、手势等多种交互方式
+- **上下文感知**: 深度理解用户意图和桌面环境状态
+- **自适应学习**: 根据用户习惯优化操作策略
+- **工作流编排**: 支持复杂任务的自动化编排和执行
 
----
+### 广泛的AI提供商支持
+- **主流云服务**: OpenAI GPT系列、Anthropic Claude、Google Gemini、Azure OpenAI
+- **开源模型**: Ollama、LM Studio、vLLM等本地部署方案
+- **专业模型**: 针对特定领域的专业AI模型
+- **混合推理**: 支持多模型协同工作
 
-[![Star NeuralAgent](https://img.shields.io/github/stars/withneural/neuralagent?style=social)](https://github.com/withneural/neuralagent/stargazers)
+### 高级功能
+- **语音交互**: 实时语音识别和合成
+- **文档处理**: PDF、Word、Excel等文档的智能处理
+- **网页自动化**: 高级浏览器操作和数据提取
+- **系统集成**: 深度集成操作系统API
+- **安全保护**: 企业级安全控制和隐私保护
 
-> ⭐️ If NeuralAgent inspires or helps you, give it a star!
-
----
-
-In this demo, NeuralAgent was given the following prompt:
-
-"Find 5 2025 AI trends, write about them on Notepad and save it to my desktop!"
-
-It took care of the rest!
-
-![Demo](docs/images/demo.gif)
-
----
-
-## 🌐 Website & Community
-
-- 🌍 **Website**: [https://www.getneuralagent.com](https://www.getneuralagent.com)
-- 💬 **Discord**: [Join NeuralAgent Discord](https://discord.gg/eGyW3kPcUs)
-
----
-
-## 🚀 Features
-
-- ✅ Desktop automation with `pyautogui`
-- ✅ Background automation (Windows Only For Now) via WSL (browser-only).
-- ✅ Supports Anthropic, OpenAI, Azure OpenAI, AWS Bedrock, Gemini and Ollama.
-- ✅ Modular agents: Planner, Classifier, Suggestor, Title, and more
-- ✅ Multimodal (text + vision)
-- ✅ FastAPI backend + Electron + React frontend
-
----
-
-## 🖥️ Project Structure
+## 🏗️ 技术架构
 
 ```
-neuralagent/
-├── backend/              # FastAPI + Postgres backend
-├── desktop/              # ElectronJS desktop app
-│   └── neuralagent-app/  # React frontend inside Electron
-│   └── aiagent/          # Python code (pyautogui)
-└── README.md
+xihe/
+├── backend/              # FastAPI后端服务
+│   ├── api/             # API路由
+│   ├── core/            # 核心业务逻辑
+│   ├── models/          # 数据模型
+│   ├── services/        # 服务层
+│   └── utils/           # 工具函数
+├── frontend/            # Electron+React前端
+│   ├── src/             # React应用源码
+│   ├── electron/        # Electron主进程
+│   └── public/          # 静态资源
+├── agents/              # AI代理系统
+│   ├── core/            # 代理核心
+│   ├── providers/       # AI提供商适配
+│   └── tools/           # 工具集
+├── desktop/             # 桌面自动化
+│   ├── automation/      # 自动化引擎
+│   ├── ui/              # UI交互
+│   └── system/          # 系统集成
+└── docs/                # 文档
 ```
----
 
-# 🔧 Prerequisites
+## 🚀 快速开始
 
-Before running **NeuralAgent**, make sure the following dependencies are installed on your machine:
+### 环境要求
+- Python 3.9+
+- Node.js 18+
+- PostgreSQL 13+
+- 操作系统: Windows 10+, macOS 10.15+, Ubuntu 20.04+
 
-| Tool              | Purpose                                           | Recommended Version |
-|-------------------|---------------------------------------------------|----------------------|
-| 🐍 **Python**       | Required for backend and local AI agent daemon   | `>= 3.9`              |
-| 🐘 **PostgreSQL**   | Relational database used by the backend          | `>= 13`               |
-| 🟦 **Node.js + npm** | Needed to run the Electron + React frontend      | `Node >= 18`, `npm >= 9` |
+### 安装步骤
 
----
+1. **克隆项目**
+```bash
+git clone https://github.com/your-org/xihe.git
+cd xihe
+```
 
-## 📥 Installation Guides
-
-- **Python**: [https://www.python.org/downloads/](https://www.python.org/downloads/)
-- **PostgreSQL**: [https://www.postgresql.org/download/](https://www.postgresql.org/download/)
-- **Node.js (includes npm)**: [https://nodejs.org/en/download](https://nodejs.org/en/download)
-
----
-
-## ⚠️ OS Notes
-
-- NeuralAgent works on **Windows**, **macOS**, and **Linux**.
-- However, **background automation (browser control via WSL)** is **Windows-only** for now.
-
----
-
-## ⚙️ Setup Instructions
-
-> 🧪 Open **two terminal windows** - one for `backend` and one for `desktop`.
-
----
-
-### 🐍 Backend Setup
-
-1. **Create and activate a virtual environment (optional but recommended):**
-
+2. **后端设置**
 ```bash
 cd backend
 python -m venv venv
-# Activate:
-source venv/bin/activate  # macOS/Linux
-venv\Scripts\activate     # Windows
-```
-
-2. **Install requirements:**
-
-```bash
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-3. **Create a local Postgres database. (You have to install Postgres on your computer)**
-
-4. **Copy `.env.example` to `.env` and fill in:**
-
-```env
-DB_HOST=
-DB_PORT=
-DB_DATABASE=
-DB_USERNAME=
-DB_PASSWORD=
-
-# Not Needed, Just keep empty
-DB_CONNECTION_STRING=
-
-JWT_ISS=NeuralAgentBackend
-# Generate a Random String for the JWT_SECRET
-JWT_SECRET=
-
-# Keep Empty, for now!
-REDIS_CONNECTION=
-
-# Optional: For Bedrock
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-BEDROCK_REGION=us-west-2
-
-# Optional: For Azure OpenAI
-AZURE_OPENAI_ENDPOINT=
-AZURE_OPENAI_API_KEY=
-OPENAI_API_VERSION=2024-12-01-preview
-
-# Optional: OpenAI/Anthropic
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
-
-# Optional: For Gemini
-GOOGLE_API_KEY=
-
-# Needed if using Ollama, customize if needed
-OLLAMA_URL=http://127.0.0.1:11434
-
-# Model config per agent
-CLASSIFIER_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock|ollama|gemini # Select one
-CLASSIFIER_AGENT_MODEL_ID=gpt-4.1
-
-TITLE_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock|ollama|gemini # Select one
-TITLE_AGENT_MODEL_ID=gpt-4.1-nano
-
-SUGGESTOR_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock|ollama|gemini # Select one
-SUGGESTOR_AGENT_MODEL_ID=gpt-4.1-mini
-
-PLANNER_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock|ollama|gemini # Select one
-PLANNER_AGENT_MODEL_ID=gpt-4.1
-
-COMPUTER_USE_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock|ollama|gemini # Select one
-COMPUTER_USE_AGENT_MODEL_ID=us.anthropic.claude-sonnet-4-20250514-v1:0
-
-SUMMARIZER_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock|ollama|gemini # Select One
-SUMMARIZER_AGENT_MODEL_ID=gpt-4.1-mini
-
-# Internal use only by Neural for optional screenshot logging during training (off by default).
-# This is not used by the open-source app or contributors.
-ENABLE_SCREENSHOT_LOGGING_FOR_TRAINING=false
-AWS_DEFAULT_REGION=us-east-1
-AWS_BUCKET=
-
-# For Tracing, Keep false if you don't need langsmith tracing.
-LANGCHAIN_TRACING_V2=false
-LANGCHAIN_ENDPOINT=
-LANGCHAIN_API_KEY=
-LANGCHAIN_PROJECT=
-
-# Optional for Google Login
-GOOGLE_LOGIN_CLIENT_ID=
-GOOGLE_LOGIN_CLIENT_SECRET=
-GOOGLE_LOGIN_DESKTOP_REDIRECT_URI=http://127.0.0.1:36478
-```
-
-5. **Run database migrations:**
-
-```bash
 alembic upgrade head
+uvicorn main:app --reload
 ```
 
-6. **Start the backend server:**
-
+3. **前端设置**
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
----
-
-### 🖥️ Frontend (Desktop + Electron) Setup
-
-1. **Install dependencies in the Electron root:**
-
-```bash
-cd desktop
+cd frontend
 npm install
+npm run electron:dev
 ```
 
-2. **Navigate to the React app:**
+## 📖 使用指南
 
-```bash
-cd neuralagent-app
-npm install
-```
+### 基本使用
+1. 启动应用后，通过语音或文本输入任务描述
+2. 羲和会分析任务并制定执行计划
+3. 自动执行桌面操作，完成用户任务
+4. 提供实时反馈和进度监控
 
-3. **Copy `.env.example` to `.env` and fill in:**
+### 高级功能
+- **工作流设计**: 通过可视化界面设计复杂自动化流程
+- **模型选择**: 根据任务类型选择最适合的AI模型
+- **安全模式**: 在受控环境中执行敏感操作
+- **团队协作**: 共享工作流和最佳实践
+
+## 🔧 配置
+
+### AI提供商配置
+在 `backend/.env` 中配置AI提供商：
 
 ```env
-REACT_APP_PROTOCOL=http
-REACT_APP_WEBSOCKET_PROTOCOL=ws
-REACT_APP_DNS=127.0.0.1:8000
-REACT_APP_API_KEY=
+# OpenAI
+OPENAI_API_KEY=your_key
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+# Anthropic
+ANTHROPIC_API_KEY=your_key
+
+# Google Gemini
+GOOGLE_API_KEY=your_key
+
+# 本地模型
+OLLAMA_BASE_URL=http://localhost:11434
 ```
 
-4. **Go back to the desktop root:**
-
-```bash
-cd ..
+### 安全配置
+```env
+# 安全设置
+SECURITY_LEVEL=high
+ALLOWED_DOMAINS=*.example.com
+ENCRYPTION_KEY=your_encryption_key
 ```
 
-5. **Set up the local AI agent daemon (Python service):**
-```bash
-cd aiagent
-python -m venv venv
-source venv/bin/activate  # Or use `venv\Scripts\activate` on Windows
-pip install -r requirements.txt
-deactivate
-```
+## 🤝 贡献指南
 
-6. **Start the Electron desktop app:**
+我们欢迎社区贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详细信息。
 
-```bash
-cd ..
-npm start
-```
+## 📄 许可证
+
+本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
+
+## 🆘 支持
+
+- 📧 邮箱: support@xihe.ai
+- 💬 讨论: [GitHub Discussions](https://github.com/your-org/xihe/discussions)
+- 🐛 问题: [GitHub Issues](https://github.com/your-org/xihe/issues)
 
 ---
 
-## 🤖 Agents & Model Providers
-
-You can configure different model providers (`OpenAI`, `Azure OpenAI`, `Anthropic`, `Bedrock`, `Ollama`, `Gemini`) per agent in `.env`.  
-Agent types include:
-
-- `PLANNER_AGENT`
-- `CLASSIFIER_AGENT`
-- `TITLE_AGENT`
-- `SUGGESTOR_AGENT`
-- `COMPUTER_USE_AGENT`
-- `SUMMARIZER_AGENT`
-
----
-
-## 📣 Contributing
-
-We welcome pull requests and community contributions!
-
----
-
-## 🛡️ License
-
-MIT License.  
-Use at your own risk. This tool moves your mouse and types on your behalf, test responsibly!
-
----
-
-## 💬 Questions?
-
-Feel free to open an issue or start a discussion.
+**羲和** - 让AI真正理解你的桌面世界

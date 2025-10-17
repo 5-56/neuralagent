@@ -1,36 +1,57 @@
-fastapi
-uvicorn
-python-dotenv
-sqlmodel
-pydantic
-alembic
-sqlalchemy
-psycopg2
-passlib
-bcrypt
-pyjwt
-boto3
-botocore
-python-multipart
-pillow
-langchain
-langchain-community
-langchain-core
-langchain-text-splitters
-langchain-openai
-langchain-aws
-langchain-azure-ai
-langchain-anthropic
-anthropic
-langchain-ollama
-ollama
-langchain-google-genai
-youtube-transcript-api
-beautifulsoup4
-anthropic
-transformers
-websockets
-broadcaster
-broadcaster[redis]
-asyncio-redis
-requests
+# 羲和项目依赖
+# 核心框架
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# 数据库
+sqlalchemy==2.0.23
+alembic==1.13.1
+psycopg2-binary==2.9.9
+redis==5.0.1
+
+# 认证和安全
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# AI和机器学习
+langchain==0.1.0
+langchain-openai==0.0.5
+langchain-anthropic==0.1.0
+langchain-google-genai==0.0.6
+langchain-ollama==0.1.0
+
+# 桌面自动化
+pyautogui==0.9.54
+mss==9.0.1
+Pillow==10.1.0
+pyperclip==1.8.2
+psutil==5.9.6
+
+# 语音处理
+pyaudio==0.2.11
+speechrecognition==3.10.0
+pyttsx3==2.90
+
+# 图像处理
+opencv-python==4.8.1.78
+numpy==1.24.3
+
+# 监控和日志
+prometheus-client==0.19.0
+structlog==23.2.0
+
+# 工具
+python-dotenv==1.0.0
+httpx==0.25.2
+aiofiles==23.2.1
+
+# 开发工具
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+isort==5.12.0
+mypy==1.7.1
+ruff==0.1.7
