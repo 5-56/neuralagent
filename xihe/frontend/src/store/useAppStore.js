@@ -27,13 +27,18 @@ const useAppStore = create(
       maxTokens: 2000,
       
       // 任务状态
+      tasks: [],
       currentTask: null,
       taskHistory: [],
       isTaskRunning: false,
       
       // 聊天状态
+      conversations: [],
+      currentConversation: null,
+      messages: [],
       chatHistory: [],
       currentChat: null,
+      isTyping: false,
       
       // 设置
       settings: {
@@ -150,6 +155,123 @@ const useAppStore = create(
       
       clearError: () => {
         set({ error: null });
+      },
+      
+      // 任务管理
+      fetchTasks: async () => {
+        set({ isLoading: true });
+        try {
+          // 模拟API调用
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const mockTasks = [
+            {
+              id: 1,
+              title: '示例任务1',
+              description: '这是一个示例任务',
+              status: 'pending',
+              priority: 'normal',
+              task_type: 'desktop_automation',
+              progress: 0,
+              created_at: new Date().toISOString()
+            },
+            {
+              id: 2,
+              title: '示例任务2',
+              description: '这是另一个示例任务',
+              status: 'running',
+              priority: 'high',
+              task_type: 'web_automation',
+              progress: 50,
+              created_at: new Date().toISOString()
+            }
+          ];
+          set({ tasks: mockTasks, isLoading: false });
+        } catch (error) {
+          set({ error: error.message, isLoading: false });
+        }
+      },
+      
+      createTask: async (taskData) => {
+        set({ isLoading: true });
+        try {
+          // 模拟API调用
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const newTask = {
+            id: Date.now(),
+            ...taskData,
+            status: 'pending',
+            progress: 0,
+            created_at: new Date().toISOString()
+          };
+          set(state => ({ tasks: [...state.tasks, newTask], isLoading: false }));
+        } catch (error) {
+          set({ error: error.message, isLoading: false });
+        }
+      },
+      
+      updateTask: async (taskId, taskData) => {
+        set({ isLoading: true });
+        try {
+          // 模拟API调用
+          await new Promise(resolve => setTimeout(resolve, 500));
+          set(state => ({
+            tasks: state.tasks.map(task => 
+              task.id === taskId ? { ...task, ...taskData } : task
+            ),
+            isLoading: false
+          }));
+        } catch (error) {
+          set({ error: error.message, isLoading: false });
+        }
+      },
+      
+      deleteTask: async (taskId) => {
+        set({ isLoading: true });
+        try {
+          // 模拟API调用
+          await new Promise(resolve => setTimeout(resolve, 500));
+          set(state => ({
+            tasks: state.tasks.filter(task => task.id !== taskId),
+            isLoading: false
+          }));
+        } catch (error) {
+          set({ error: error.message, isLoading: false });
+        }
+      },
+      
+      // 对话管理
+      sendMessage: async (messageData) => {
+        set({ isTyping: true });
+        try {
+          // 添加用户消息
+          const userMessage = {
+            id: Date.now(),
+            role: 'user',
+            content: messageData.content,
+            timestamp: new Date().toISOString()
+          };
+          
+          set(state => ({
+            messages: [...state.messages, userMessage]
+          }));
+          
+          // 模拟AI响应
+          setTimeout(() => {
+            const aiMessage = {
+              id: Date.now() + 1,
+              role: 'assistant',
+              content: '这是一个模拟的AI响应。我理解您的需求，正在为您处理...',
+              timestamp: new Date().toISOString()
+            };
+            
+            set(state => ({
+              messages: [...state.messages, aiMessage],
+              isTyping: false
+            }));
+          }, 2000);
+        } catch (error) {
+          set({ error: error.message, isTyping: false });
+        }
       }
     }),
     {

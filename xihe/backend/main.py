@@ -16,7 +16,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from core.config import settings
 from core.database import init_db
 from core.security import setup_security
-from api.v1.api import api_router
+from api import api_router
 from core.exceptions import XiheException
 from core.middleware import LoggingMiddleware, RateLimitMiddleware
 from core.monitoring import setup_monitoring
