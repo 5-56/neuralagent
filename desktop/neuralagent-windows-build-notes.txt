@@ -1,2 +1,0 @@
-- Update .env to include production server info.
-- Update suggestor + aiagent to run from compiled version rather than python code.
